@@ -1,0 +1,989 @@
+/*
+  Design direction: a dense, dark "operator" dashboard for watching several
+  transfers at once -- closer to a network monitoring tool than a media app.
+  System font stack (no CDN fonts) so this keeps working with zero internet
+  access, which matters for something served over a private Tailnet.
+  Numeric/data columns use a monospace face so speeds and percentages line
+  up in a column and are easy to scan; everything else uses the UI sans.
+  The signature element is the progress bar: a diagonal moving stripe on
+  actively-downloading rows is the one bit of motion in an otherwise still
+  interface, so an at-a-glance look at the list tells you what's actually
+  moving right now.
+*/
+
+:root {
+  --bg: #10121a;
+  --bg-elevated: #171a24;
+  --surface: #1b1f2a;
+  --surface-hover: #222736;
+  --border: #2a2f3d;
+  --border-soft: #232735;
+
+  --text: #e7e9f0;
+  --text-muted: #8d93a6;
+  --text-faint: #5d6376;
+
+  --accent: #2dd4bf;
+  --accent-soft: rgba(45, 212, 191, 0.14);
+
+  --status-downloading: #2dd4bf;
+  --status-seeding: #6ee7a8;
+  --status-verifying: #fbbf24;
+  --status-queued: #7c86a3;
+  --status-stopped: #5d6376;
+  --status-error: #f87171;
+  --status-upload: #a78bfa;
+
+  --danger: #f87171;
+  --danger-soft: rgba(248, 113, 113, 0.14);
+  --success: #6ee7a8;
+
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+
+  --font-ui:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", "Inter", Roboto, Helvetica, Arial, sans-serif;
+  --font-mono:
+    "SF Mono", "IBM Plex Mono", "JetBrains Mono", Menlo, Consolas, "Liberation Mono", monospace;
+
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-ui);
+  font-size: 14px;
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+}
+
+.app {
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ---------- Header ---------- */
+
+.app-header {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 14px 24px;
+  background: var(--bg-elevated);
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.app-header__brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 700;
+  font-size: 16px;
+  letter-spacing: -0.01em;
+  color: var(--text);
+}
+
+.app-header__mark {
+  color: var(--accent);
+  font-size: 14px;
+}
+
+.app-header__nav {
+  display: flex;
+  gap: 4px;
+  margin-right: auto;
+  overflow-x: auto;
+}
+
+.app-header__tab {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  padding: 7px 12px;
+  border-radius: var(--radius-sm);
+  font-size: 13.5px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.app-header__tab:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+
+.app-header__tab--active {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.app-main {
+  flex: 1;
+  padding: 20px 24px 48px;
+  max-width: 1280px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+/* ---------- Buttons ---------- */
+
+.button {
+  font-family: var(--font-ui);
+  font-size: 13.5px;
+  font-weight: 600;
+  border-radius: var(--radius-sm);
+  padding: 8px 14px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: background-color 0.12s ease, border-color 0.12s ease;
+}
+
+.button--primary {
+  background: var(--accent);
+  color: #08211d;
+}
+
+.button--primary:hover:not(:disabled) {
+  background: #4de0cc;
+}
+
+.button--ghost {
+  background: transparent;
+  border-color: var(--border);
+  color: var(--text);
+}
+
+.button--ghost:hover:not(:disabled) {
+  background: var(--surface-hover);
+}
+
+.button--danger {
+  background: var(--danger);
+  color: #2a0d0d;
+}
+
+.button--danger:hover:not(:disabled) {
+  background: #fb8b8b;
+}
+
+.button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.icon-button {
+  width: 30px;
+  height: 30px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+  font-size: 13px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.icon-button:hover:not(:disabled) {
+  background: var(--surface-hover);
+  border-color: var(--accent);
+}
+
+.icon-button--danger:hover:not(:disabled) {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.icon-button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* ---------- Stats bar ---------- */
+
+.stats-bar {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  background: var(--surface);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-md);
+  padding: 12px 18px;
+  margin-bottom: 16px;
+}
+
+.stats-bar--empty {
+  color: var(--text-faint);
+  font-size: 13px;
+}
+
+.stats-bar__item {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.stats-bar__value {
+  font-family: var(--font-mono);
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.stats-bar__value--down {
+  color: var(--status-downloading);
+}
+
+.stats-bar__value--up {
+  color: var(--status-upload);
+}
+
+.stats-bar__label {
+  font-size: 11px;
+  color: var(--text-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.stats-bar__divider {
+  width: 1px;
+  align-self: stretch;
+  background: var(--border);
+}
+
+/* ---------- Torrent table ---------- */
+
+.torrent-table-wrap {
+  background: var(--surface);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.torrent-table-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.filter-input {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: var(--radius-sm);
+  padding: 7px 10px;
+  font-size: 13px;
+  width: 240px;
+}
+
+.filter-input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+}
+
+.torrent-count {
+  color: var(--text-faint);
+  font-size: 12px;
+  font-family: var(--font-mono);
+}
+
+.torrent-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.torrent-table thead th {
+  text-align: left;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-faint);
+  font-weight: 600;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.torrent-row td {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border-soft);
+  vertical-align: middle;
+}
+
+.torrent-row:last-child td {
+  border-bottom: none;
+}
+
+.torrent-row:hover {
+  background: var(--surface-hover);
+}
+
+.torrent-row__name {
+  max-width: 340px;
+}
+
+.torrent-row__name-text {
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.torrent-row__meta {
+  font-size: 11.5px;
+  color: var(--text-faint);
+  font-family: var(--font-mono);
+  margin-top: 2px;
+}
+
+.torrent-row__progress {
+  width: 180px;
+}
+
+.torrent-row__actions {
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
+.mono {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- Progress bar (signature element) ---------- */
+
+.progress {
+  position: relative;
+  height: 20px;
+  border-radius: 999px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+
+.progress__fill {
+  position: absolute;
+  inset: 0;
+  width: 0;
+  background: var(--status-stopped);
+  transition: width 0.4s ease;
+}
+
+.progress__fill--status-4 {
+  background: linear-gradient(90deg, #1fb8a3, var(--status-downloading));
+}
+.progress__fill--status-6 {
+  background: var(--status-seeding);
+}
+.progress__fill--status-2 {
+  background: var(--status-verifying);
+}
+.progress__fill--status-1,
+.progress__fill--status-3,
+.progress__fill--status-5 {
+  background: var(--status-queued);
+}
+.progress__fill--status-0 {
+  background: var(--status-stopped);
+}
+
+.progress__fill--active::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: repeating-linear-gradient(
+    45deg,
+    rgba(255, 255, 255, 0.16) 0,
+    rgba(255, 255, 255, 0.16) 6px,
+    transparent 6px,
+    transparent 12px
+  );
+  animation: progress-stripe 1s linear infinite;
+}
+
+@keyframes progress-stripe {
+  from {
+    background-position: 0 0;
+  }
+  to {
+    background-position: 17px 0;
+  }
+}
+
+.progress__label {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .progress__fill--active::after {
+    animation: none;
+  }
+}
+
+/* ---------- Status badge ---------- */
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  color: var(--text);
+  white-space: nowrap;
+}
+
+.status-badge__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--dot-color, var(--status-stopped));
+  flex-shrink: 0;
+}
+
+.status-badge--animated .status-badge__dot {
+  animation: pulse 1.4s ease-in-out infinite;
+}
+
+.status-badge--error .status-badge__dot {
+  background: var(--status-error) !important;
+}
+
+.status-badge--error {
+  color: var(--status-error);
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+/* ---------- Empty / error states ---------- */
+
+.empty-state {
+  padding: 48px 24px;
+  text-align: center;
+  color: var(--text-muted);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.banner {
+  margin: 12px 16px;
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+}
+
+.banner--error {
+  background: var(--danger-soft);
+  color: #ffb4b4;
+  border: 1px solid rgba(248, 113, 113, 0.35);
+}
+
+/* ---------- Modal ---------- */
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(8, 9, 13, 0.65);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  padding: 16px;
+}
+
+.modal {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  width: 100%;
+  max-width: 460px;
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+
+.modal__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.modal__header h2 {
+  margin: 0;
+  font-size: 15px;
+}
+
+.modal__body {
+  padding: 20px;
+}
+
+.modal__footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 16px 20px;
+  border-top: 1px solid var(--border-soft);
+}
+
+/* ---------- Forms ---------- */
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 14px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.field input[type="text"],
+.field input[type="password"],
+.field input[type="number"] {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: var(--radius-sm);
+  padding: 9px 10px;
+  font-size: 13.5px;
+  font-family: var(--font-ui);
+}
+
+.field input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+}
+
+.field input[type="file"] {
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.field--checkbox {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+
+.field--radio {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.tab-strip {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 16px;
+  background: var(--surface);
+  border-radius: var(--radius-sm);
+  padding: 3px;
+  border: 1px solid var(--border-soft);
+}
+
+.tab-strip__tab {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  padding: 7px 10px;
+  border-radius: 5px;
+  font-size: 12.5px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.tab-strip__tab--active {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.speed-direction {
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  margin: 0 0 12px;
+}
+
+.speed-direction legend {
+  font-size: 12px;
+  color: var(--text-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 0 4px;
+}
+
+.speed-direction__input {
+  width: 80px;
+  margin-left: 4px;
+}
+
+.speed-direction__unit {
+  color: var(--text-faint);
+  font-size: 12px;
+}
+
+.form-error {
+  color: var(--status-error);
+  font-size: 13px;
+}
+
+.form-warning {
+  color: var(--status-verifying);
+  font-size: 12.5px;
+}
+
+.muted {
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+/* ---------- Settings panel ---------- */
+
+.settings-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 720px;
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-md);
+  padding: 18px 20px;
+}
+
+.card h2 {
+  margin: 0 0 4px;
+  font-size: 15px;
+}
+
+.card__header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.settings-form {
+  margin-top: 14px;
+}
+
+.settings-form__actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin-top: 14px;
+}
+
+.stats-grid__group h3 {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-faint);
+  margin: 0 0 8px;
+}
+
+.stats-grid__group dl {
+  margin: 0;
+}
+
+.stats-grid__group dl > div {
+  display: flex;
+  justify-content: space-between;
+  padding: 4px 0;
+  border-bottom: 1px dashed var(--border-soft);
+  font-size: 12.5px;
+}
+
+.stats-grid__group dt {
+  color: var(--text-muted);
+}
+
+.stats-grid__group dd {
+  margin: 0;
+  font-family: var(--font-mono);
+}
+
+/* ---------- Toasts ---------- */
+
+.toast-stack {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 200;
+  max-width: 360px;
+}
+
+.toast {
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  border: 1px solid var(--border);
+}
+
+.toast--error {
+  background: #2a1414;
+  color: #ffb4b4;
+  border-color: rgba(248, 113, 113, 0.4);
+}
+
+.toast--success {
+  background: #12261e;
+  color: #a3f2c6;
+  border-color: rgba(110, 231, 168, 0.35);
+}
+
+/* ---------- Responsive ---------- */
+
+/* Tablet / narrow desktop: table stays a table, just tightens up */
+@media (max-width: 860px) and (min-width: 641px) {
+  .torrent-row__name {
+    max-width: 200px;
+  }
+
+  .torrent-row__progress {
+    width: 130px;
+  }
+
+  .stats-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Phone: switch the torrent list from a table to labeled cards */
+@media (max-width: 640px) {
+  body {
+    font-size: 15px;
+  }
+
+  .app-header {
+    flex-wrap: wrap;
+    padding: 10px 14px;
+    gap: 8px 12px;
+  }
+
+  .app-header__brand {
+    font-size: 15px;
+  }
+
+  .app-header__nav {
+    order: 3;
+    flex-basis: 100%;
+    margin-right: 0;
+  }
+
+  .app-header__tab {
+    flex: 1;
+    text-align: center;
+  }
+
+  .app-main {
+    padding: 14px 12px 40px;
+  }
+
+  .stats-bar {
+    flex-wrap: wrap;
+    row-gap: 10px;
+    padding: 12px 14px;
+  }
+
+  .stats-bar__divider {
+    display: none;
+  }
+
+  .torrent-table-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  .filter-input {
+    width: 100%;
+  }
+
+  .torrent-count {
+    text-align: right;
+  }
+
+  .stats-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .card {
+    padding: 16px;
+  }
+
+  .modal-backdrop {
+    align-items: flex-end;
+    padding: 0;
+  }
+
+  .modal {
+    max-width: none;
+    width: 100%;
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    max-height: calc(100vh - 48px);
+  }
+
+  /* Table -> card list. Each row becomes a small grid with named areas
+     instead of the desktop's columns, so every value keeps a label
+     (rather than a bare unlabeled number sitting awkwardly on the right). */
+  .torrent-table thead {
+    display: none;
+  }
+
+  .torrent-table,
+  .torrent-table tbody {
+    display: block;
+    width: 100%;
+  }
+
+  .torrent-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-areas:
+      "name name"
+      "progress progress"
+      "status eta"
+      "down up"
+      "actions actions";
+    column-gap: 12px;
+    row-gap: 10px;
+    padding: 14px;
+    border-bottom: 1px solid var(--border-soft);
+  }
+
+  .torrent-row td {
+    padding: 0;
+    border: none;
+  }
+
+  .torrent-row__name {
+    grid-area: name;
+    max-width: none;
+  }
+
+  .torrent-row__progress {
+    grid-area: progress;
+    width: auto;
+  }
+
+  .torrent-row__status {
+    grid-area: status;
+  }
+
+  .torrent-row__down,
+  .torrent-row__up,
+  .torrent-row__eta {
+    font-size: 13px;
+  }
+
+  .torrent-row__down {
+    grid-area: down;
+  }
+
+  .torrent-row__up {
+    grid-area: up;
+    text-align: right;
+  }
+
+  .torrent-row__eta {
+    grid-area: eta;
+    text-align: right;
+    color: var(--text-muted);
+  }
+
+  .torrent-row__down::before {
+    content: "\2193 ";
+    color: var(--status-downloading);
+  }
+
+  .torrent-row__up::before {
+    content: "\2191 ";
+    color: var(--status-upload);
+  }
+
+  .torrent-row__eta::before {
+    content: "ETA ";
+    font-family: var(--font-ui);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    color: var(--text-faint);
+  }
+
+  .torrent-row__actions {
+    grid-area: actions;
+    justify-content: stretch;
+    gap: 8px;
+    padding-top: 10px;
+    border-top: 1px solid var(--border-soft);
+  }
+
+  .torrent-row__actions .icon-button {
+    flex: 1;
+    width: auto;
+    height: 40px;
+    font-size: 15px;
+  }
+
+  .add-torrent-form .tab-strip__tab {
+    font-size: 12px;
+    padding: 8px 6px;
+  }
+
+  .speed-direction__input {
+    width: 70px;
+  }
+}

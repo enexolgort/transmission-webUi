@@ -1,0 +1,7 @@
+services:
+  transmission-ui:
+    build: .
+    container_name: transmission-ui
+    ports:
+      - "4173:80"
+    restart: unless-stopped

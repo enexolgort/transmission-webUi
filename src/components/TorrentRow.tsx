@@ -125,16 +125,7 @@ export function TorrentRow({ torrent, onChanged }: Props) {
         />
       )}
 
-      {showPush && (
-        <PushSftpDialog
-          torrent={torrent}
-          onClose={() => setShowPush(false)}
-          onPush={async (remoteFolder) => {
-            await api.pushToSftp(torrent.id, remoteFolder);
-            notify(`Pushed "${torrent.name}" to ${remoteFolder}`, "success");
-          }}
-        />
-      )}
+      {showPush && <PushSftpDialog torrent={torrent} onClose={() => setShowPush(false)} />}
 
       {showRemove && (
         <ConfirmRemoveDialog

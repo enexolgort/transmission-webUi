@@ -70,6 +70,30 @@ export interface PushSftpRequest {
   remoteFolder: string;
 }
 
+export interface PushSftpAcceptedResponse {
+  jobId: string;
+  statusUrl: string;
+  torrentId: number;
+  localPath: string;
+  remoteFolder: string;
+}
+
+export type TransferStatus = "pending" | "uploading" | "completed" | "failed";
+
+export interface TransferJob {
+  id: string;
+  torrentId: number;
+  remoteFolder: string;
+  localPath: string;
+  status: TransferStatus;
+  bytesTransferred: number;
+  totalBytes: number;
+  currentFile?: string;
+  error?: string; // present only when status === "failed"
+  startedAt: string;
+  finishedAt?: string; // present only once status is "completed" or "failed"
+}
+
 export interface SessionSettings {
   [key: string]: unknown;
 }

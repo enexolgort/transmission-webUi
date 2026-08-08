@@ -2,10 +2,12 @@ import type {
   AddTorrentRequest,
   AddTorrentResponse,
   ApiErrorBody,
+  PushSftpAcceptedResponse,
   PushSftpRequest,
   SessionSettings,
   SessionStats,
   SpeedLimitRequest,
+  TransferJob,
   Torrent,
 } from "../types";
 import type { Settings } from "./settings";
@@ -120,11 +122,19 @@ export class ApiClient {
     });
   }
 
-  pushToSftp(id: number, remoteFolder: string): Promise<void> {
+  pushToSftp(id: number, remoteFolder: string): Promise<PushSftpAcceptedResponse> {
     return this.request(`/torrents/${id}/push-sftp`, {
       method: "POST",
       body: JSON.stringify({ remoteFolder } satisfies PushSftpRequest),
     });
+  }
+
+  getTransfer(jobId: string): Promise<{ transfer: TransferJob }> {
+    return this.request(`/transfers/${jobId}`);
+  }
+
+  listTransfers(): Promise<{ transfers: TransferJob[] }> {
+    return this.request("/transfers");
   }
 
   getSession(): Promise<{ session: SessionSettings }> {

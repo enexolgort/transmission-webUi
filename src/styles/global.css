@@ -1035,3 +1035,66 @@ body {
     width: 70px;
   }
 }
+
+.transfer-progress {
+  margin-top: 4px;
+}
+
+.transfer-progress__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.transfer-progress__folder {
+  font-size: 13px;
+  color: var(--text);
+}
+
+.transfer-status {
+  font-size: 11.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 3px 8px;
+  border-radius: 999px;
+}
+
+.transfer-status--pending,
+.transfer-status--uploading {
+  color: var(--status-downloading);
+  background: var(--accent-soft);
+}
+
+.transfer-status--completed {
+  color: var(--success);
+  background: rgba(110, 231, 168, 0.14);
+}
+
+.transfer-status--failed {
+  color: var(--danger);
+  background: var(--danger-soft);
+}
+
+.progress--large {
+  height: 26px;
+}
+
+.progress__fill--transfer {
+  background: linear-gradient(90deg, #1fb8a3, var(--status-downloading));
+}
+
+.progress__fill--transfer.progress__fill--done {
+  background: var(--status-seeding);
+}
+
+.progress__fill--transfer.progress__fill--failed {
+  background: var(--danger);
+}
+
+.transfer-progress__meta {
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--text-faint);
+}

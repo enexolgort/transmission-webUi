@@ -83,7 +83,7 @@ export function TorrentRow({ torrent, onChanged }: Props) {
           >
             {busy === "verify" ? "\u2026" : "\u21BB"}
           </button>
-          {torrent.isFinished && (
+          {torrent.percentDone >= 1 && (
             <button
               className="icon-button"
               title="Push to remote"

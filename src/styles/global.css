@@ -678,6 +678,54 @@ body {
   font-size: 13px;
 }
 
+.destination-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.destination-button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  color: var(--text);
+  cursor: pointer;
+  text-align: left;
+  font-family: var(--font-ui);
+}
+
+.destination-button:hover:not(:disabled) {
+  border-color: var(--accent);
+  background: var(--surface-hover);
+}
+
+.destination-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.destination-button__label {
+  font-weight: 600;
+  font-size: 13.5px;
+}
+
+.destination-button__path {
+  color: var(--text-faint);
+  font-size: 12px;
+  flex: 1;
+}
+
+.destination-button__status {
+  color: var(--accent);
+  font-size: 13px;
+}
+
 /* ---------- Settings panel ---------- */
 
 .settings-panel {

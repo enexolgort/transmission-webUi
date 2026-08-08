@@ -66,6 +66,10 @@ export interface SpeedLimitRequest {
   uploadKBps?: number | null;
 }
 
+export interface PushSftpRequest {
+  remoteFolder: string;
+}
+
 export interface SessionSettings {
   [key: string]: unknown;
 }

@@ -4,6 +4,7 @@ import { formatBytes, formatEta, formatSpeed } from "../lib/format";
 import { ProgressBar } from "./ProgressBar";
 import { StatusBadge } from "./StatusBadge";
 import { SpeedLimitDialog } from "./SpeedLimitDialog";
+import { PushSftpDialog } from "./PushSftpDialog";
 import { ConfirmRemoveDialog } from "./ConfirmRemoveDialog";
 import { useSettings } from "../lib/SettingsContext";
 import { useToast } from "../lib/ToastContext";
@@ -18,6 +19,7 @@ export function TorrentRow({ torrent, onChanged }: Props) {
   const { notify } = useToast();
   const [busy, setBusy] = useState<string | null>(null);
   const [showSpeedLimit, setShowSpeedLimit] = useState(false);
+  const [showPush, setShowPush] = useState(false);
   const [showRemove, setShowRemove] = useState(false);
 
   const isStopped = torrent.status === 0;
@@ -81,6 +83,16 @@ export function TorrentRow({ torrent, onChanged }: Props) {
           >
             {busy === "verify" ? "\u2026" : "\u21BB"}
           </button>
+          {torrent.isFinished && (
+            <button
+              className="icon-button"
+              title="Push to remote"
+              disabled={busy !== null}
+              onClick={() => setShowPush(true)}
+            >
+              {"\u21D1"}
+            </button>
+          )}
           <button
             className="icon-button"
             title="Speed limit"
@@ -109,6 +121,17 @@ export function TorrentRow({ torrent, onChanged }: Props) {
             await api.setTorrentSpeedLimit(torrent.id, limits);
             notify("Speed limit updated", "success");
             onChanged();
+          }}
+        />
+      )}
+
+      {showPush && (
+        <PushSftpDialog
+          torrent={torrent}
+          onClose={() => setShowPush(false)}
+          onPush={async (remoteFolder) => {
+            await api.pushToSftp(torrent.id, remoteFolder);
+            notify(`Pushed "${torrent.name}" to ${remoteFolder}`, "success");
           }}
         />
       )}

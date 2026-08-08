@@ -2,6 +2,7 @@ import type {
   AddTorrentRequest,
   AddTorrentResponse,
   ApiErrorBody,
+  PushSftpRequest,
   SessionSettings,
   SessionStats,
   SpeedLimitRequest,
@@ -116,6 +117,13 @@ export class ApiClient {
     return this.request(`/torrents/${id}/speed-limit`, {
       method: "PATCH",
       body: JSON.stringify(limits),
+    });
+  }
+
+  pushToSftp(id: number, remoteFolder: string): Promise<void> {
+    return this.request(`/torrents/${id}/push-sftp`, {
+      method: "POST",
+      body: JSON.stringify({ remoteFolder } satisfies PushSftpRequest),
     });
   }
 

@@ -1,8 +1,14 @@
 # Transmission UI
 
-A web UI for a `transmission-api` backend (the Express/TypeScript wrapper around
-Transmission's RPC), built against the provided `openapi.yaml`. React + Vite +
-TypeScript, runs as its own small server/process alongside your existing API.
+A web UI for the [`transmission-api`](https://github.com/enexolgort/transmission-API)
+backend (the Express/TypeScript wrapper around Transmission's RPC), built
+against the `openapi.yaml` it provides. React + Vite + TypeScript, runs as
+its own small server/process alongside that API.
+
+This project is made specifically to be used with
+[enexolgort/transmission-API](https://github.com/enexolgort/transmission-API) --
+it is not a general Transmission Web UI and assumes that backend's endpoints
+and behavior.
 
 ## Features
 
@@ -21,7 +27,8 @@ TypeScript, runs as its own small server/process alongside your existing API.
 ## Requirements
 
 - Docker (recommended), **or** Node.js 18+ to run it directly
-- Your `transmission-api` backend already running somewhere reachable.
+- The [`transmission-api`](https://github.com/enexolgort/transmission-API)
+  backend already running somewhere reachable.
 
 ## Run with Docker (recommended)
 
